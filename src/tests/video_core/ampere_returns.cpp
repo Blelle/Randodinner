@@ -48,4 +48,23 @@ TEST_CASE("Ampere callees still reject writes to the link", "[video_core][ampere
     REQUIRE(lowered.error == "native callee overwrites link register");
     REQUIRE(lowered.error_offset == 0x30);
 }
+
+TEST_CASE("Ampere ISBERD with skew and ISBEWR are lowered", "[video_core][ampere]") {
+    const std::array<Instruction, 3> code{{
+        {{0xff047923, 0x00000000, 0x00007800, 0x000e2800}},
+        {{0x05000927, 0x00001004, 0x0000b800, 0x0001e200}},
+        {{0x0000794d, 0, 0x03800000, 0}},
+    }};
+    const auto lowered = LowerToMaxwell(code);
+    REQUIRE(static_cast<bool>(lowered));
+}
+
+TEST_CASE("Ampere native compute opcode 0x59f is lowered", "[video_core][ampere]") {
+    const std::array<Instruction, 2> code{{
+        {{0x0400759f, 0x60000c00, 0x0010e000, 0x000fe200}},
+        {{0x0000794d, 0, 0x03800000, 0}},
+    }};
+    const auto lowered = LowerToMaxwell(code);
+    REQUIRE(static_cast<bool>(lowered));
+}
 } // namespace

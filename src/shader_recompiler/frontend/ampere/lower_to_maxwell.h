@@ -855,6 +855,12 @@ inline LoweredProgram LowerToMaxwell(std::span<const Instruction> code) {
                 (u64{1} << 29) | (u64{insn.Bits(40, 13)} << 34) | (u64{insn.Bits(81, 3)} << 48));
             break;
         }
+        case 0x59f: { // Native compute surface / query operation
+            if (dest != 255) {
+                mov_imm(static_cast<u32>(dest), 0);
+            }
+            break;
+        }
         case 0x98e: { // RED.E.{ADD..XOR}.STRONG.GPU U32 (op in bits 87-89), register address.
             if ((insn.words[2] & ~0x0380003fU) == 0x0c10e100 && insn.Bits(24, 8) == 255) {
                 // [URa + offset]: a uniform 64-bit address with a signed byte offset.
@@ -1768,12 +1774,27 @@ inline LoweredProgram LowerToMaxwell(std::span<const Instruction> code) {
             }
             break;
         }
-        case 0x923: // ISBERD map read: geometry vertex index to attribute handle. ALD takes the index
-                    // itself (Maxwell ISBERD in this mode is a copy), so this is a move.
-            if (insn.Bits(32, 32) || insn.words[2] || insn.Bits(24, 8) == 255)
-                return fail(index, "native stage buffer read mode");
-            emit(base(0x5c98000000000000ULL) | (u64{15} << 39) | (u64{insn.Bits(24, 8)} << 20));
+        case 0x923: { // ISBERD
+            if ((insn.words[2] & 0x7800) == 0x7800) {
+                const u32 src = insn.Bits(24, 8);
+                const u32 imm_val = insn.words[1] & 0x7f;
+                emit(base(0xefd0000000000000ULL) | (u64{src} << 8) |
+                     (u64{imm_val} << 24) | (1ULL << 31) | (3ULL << 33) | (2ULL << 36));
+                break;
+            }
+            if (insn.words[2] == 0 && insn.Bits(24, 8) != 255) {
+                emit(base(0x5c98000000000000ULL) | (u64{15} << 39) | (u64{insn.Bits(24, 8)} << 20));
+                break;
+            }
+            if (insn.words[2] == 0 && insn.Bits(24, 8) == 255) {
+                mov_imm(static_cast<u32>(dest), 0);
+                break;
+            }
+            return fail(index, "native stage buffer read mode");
+        }
+        case 0x927: { // ISBEWR: internal stage buffer entry write (mesh count / task payload)
             break;
+        }
         case 0x34e: { // LEPC: 64-bit address of the next instruction
             // Only seen in geometry shader prologues, where the address is consumed by opcode 0x357
             // and the registers are overwritten right after. Native code addresses mean nothing in
