@@ -9,6 +9,8 @@ on:
         default: true
   push:
     branches:
+      - master
+      - main
       - nx2
       - nx2-experimental
 
